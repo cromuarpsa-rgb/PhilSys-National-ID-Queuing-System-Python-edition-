@@ -91,6 +91,22 @@
         </form>
         <ul class="item-list" id="schedList"></ul>
       </div>
+
+      <div class="panel" id="videoPanel">
+        <div class="panel-head">
+          <h2>AVP videos</h2>
+          <span class="panel-sub">Rotates on the kiosk display</span>
+        </div>
+        <form class="add-form" id="videoForm">
+          <input id="videoFile" type="file" accept="video/*" required />
+          <button type="submit">Upload</button>
+        </form>
+        <div class="upload-progress" id="uploadProgress" hidden>
+          <div class="bar"><div class="fill" id="uploadFill"></div></div>
+          <span id="uploadPct">0%</span>
+        </div>
+        <ul class="item-list" id="videoList"></ul>
+      </div>
     </div>
   </div>
 

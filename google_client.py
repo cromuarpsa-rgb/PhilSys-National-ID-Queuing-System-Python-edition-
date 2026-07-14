@@ -5,7 +5,9 @@ Auth: a single Service Account (no OAuth/login flow, no Apps Script bridge).
 The service account must be:
   - given "Editor" access to the Google Sheet (share the sheet with its
     client_email, found inside your service account JSON key)
-  - given at least "Viewer" access to the Drive folder holding the AVP videos
+  - given "Editor" (Content manager) access to the Drive folder holding the
+    AVP videos — Viewer access is no longer enough now that staff can
+    upload/rename/delete videos from /admin
 
 Header auto-detect / auto-fill:
   ensure_headers() runs once at startup. For each required tab it will:
@@ -16,16 +18,18 @@ Header auto-detect / auto-fill:
 
 import os
 import json
+import mimetypes
 import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive",
 ]
 
 TIMEZONE = ZoneInfo("Asia/Manila")
@@ -385,6 +389,82 @@ def list_videos():
         }
         for f in resp.get("files", [])
     ]
+
+
+def _require_drive_folder():
+    if not DRIVE_FOLDER_ID:
+        raise RuntimeError("DRIVE_FOLDER_ID is not set.")
+
+
+def list_videos_admin():
+    """Same as list_videos() but with the extra fields the admin panel's
+    list needs (size, upload time), sorted newest first."""
+    _require_drive_folder()
+    query = f"'{DRIVE_FOLDER_ID}' in parents and mimeType contains 'video' and trashed = false"
+    resp = (
+        _drive()
+        .files()
+        .list(
+            q=query,
+            fields="files(id,name,mimeType,size,createdTime)",
+            pageSize=100,
+            orderBy="createdTime desc",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        )
+        .execute()
+    )
+    return [
+        {
+            "id": f["id"],
+            "name": f["name"],
+            "mimeType": f.get("mimeType", ""),
+            "size": int(f["size"]) if f.get("size") else None,
+            "createdTime": f.get("createdTime", ""),
+        }
+        for f in resp.get("files", [])
+    ]
+
+
+def upload_video(file_storage):
+    """file_storage is a werkzeug FileStorage (request.files['file']).
+    Streams it straight into the Drive folder as a new file — resumable
+    upload so large AVP files don't have to fit in memory at once."""
+    _require_drive_folder()
+    filename = file_storage.filename or "untitled-video"
+    mimetype = file_storage.mimetype or mimetypes.guess_type(filename)[0] or "video/mp4"
+    if not mimetype.startswith("video"):
+        raise ValueError("Only video files can be uploaded here.")
+    media = MediaIoBaseUpload(file_storage.stream, mimetype=mimetype, chunksize=5 * 1024 * 1024, resumable=True)
+    request_obj = _drive().files().create(
+        body={"name": filename, "parents": [DRIVE_FOLDER_ID]},
+        media_body=media,
+        fields="id,name,mimeType,size,createdTime",
+        supportsAllDrives=True,
+    )
+    response = None
+    while response is None:
+        _status, response = request_obj.next_chunk()
+    return {
+        "id": response["id"],
+        "name": response["name"],
+        "mimeType": response.get("mimeType", ""),
+        "size": int(response["size"]) if response.get("size") else None,
+        "createdTime": response.get("createdTime", ""),
+    }
+
+
+def rename_video(file_id, new_name):
+    new_name = str(new_name or "").strip()
+    if not new_name:
+        raise ValueError("New name cannot be empty.")
+    _drive().files().update(
+        fileId=file_id, body={"name": new_name}, supportsAllDrives=True
+    ).execute()
+
+
+def delete_video(file_id):
+    _drive().files().delete(fileId=file_id, supportsAllDrives=True).execute()
 
 
 # --------------------------- Queue state (lives in the QueueState tab) ---------------------------

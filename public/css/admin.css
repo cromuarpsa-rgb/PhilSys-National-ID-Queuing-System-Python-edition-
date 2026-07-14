@@ -100,6 +100,11 @@ body {
   gap: 18px;
 }
 
+.console[hidden],
+.gate[hidden] {
+  display: none;
+}
+
 .line-card {
   background: #fff;
   border-radius: 18px;
@@ -338,6 +343,73 @@ body {
 }
 
 .item-row .del:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* -------- AVP video panel extras -------- */
+.add-form input[type="file"] {
+  flex: 1;
+  border: 1px dashed var(--line-soft);
+  background: var(--paper-100);
+  padding: 10px 12px;
+  font-size: 0.8rem;
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -6px 0 14px;
+}
+
+.upload-progress .bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 6px;
+  background: var(--paper-100);
+  overflow: hidden;
+}
+
+.upload-progress .fill {
+  height: 100%;
+  width: 0%;
+  background: var(--blue-500);
+  transition: width 0.15s ease;
+}
+
+.upload-progress span {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-600);
+  min-width: 34px;
+  text-align: right;
+}
+
+.item-row .name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+}
+
+.item-row .rename {
+  border: 1px solid var(--navy-900);
+  color: var(--navy-900);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.item-row .rename:disabled,
+.item-row .name-input:disabled {
   opacity: 0.6;
   cursor: default;
 }

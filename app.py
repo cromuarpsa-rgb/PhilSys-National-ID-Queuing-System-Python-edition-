@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request, send_from_directory
 import google_client as gc
 
 app = Flask(__name__, static_folder=None)
+app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024  # 512MB cap on uploads (AVP videos)
 
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
 PUBLIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
@@ -214,6 +215,70 @@ def api_admin_schedule_delete(row):
         return jsonify({"ok": True, "items": gc.list_schedule_admin()})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+# -------------------------------- Admin: AVP videos (Drive) CRUD --------------------------------
+
+@app.get("/api/admin/videos")
+def api_admin_videos_list():
+    if not _valid_admin_key(request.args.get("key")):
+        return jsonify({"ok": False, "error": "Invalid passcode"}), 401
+    try:
+        return jsonify({"ok": True, "items": gc.list_videos_admin()})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.post("/api/admin/videos")
+def api_admin_videos_upload():
+    # multipart/form-data: key + file, so the passcode travels as a form field
+    if not _valid_admin_key(request.form.get("key")):
+        return jsonify({"ok": False, "error": "Invalid passcode"}), 401
+    file_storage = request.files.get("file")
+    if not file_storage or not file_storage.filename:
+        return jsonify({"ok": False, "error": "No file uploaded"}), 400
+    try:
+        gc.upload_video(file_storage)
+        _invalidate_cache()
+        return jsonify({"ok": True, "items": gc.list_videos_admin()})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.post("/api/admin/videos/<file_id>/rename")
+def api_admin_videos_rename(file_id):
+    body = request.get_json(silent=True) or {}
+    if not _valid_admin_key(body.get("key")):
+        return jsonify({"ok": False, "error": "Invalid passcode"}), 401
+    name = str(body.get("name") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Name cannot be empty"}), 400
+    try:
+        gc.rename_video(file_id, name)
+        _invalidate_cache()
+        return jsonify({"ok": True, "items": gc.list_videos_admin()})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.post("/api/admin/videos/<file_id>/delete")
+def api_admin_videos_delete(file_id):
+    body = request.get_json(silent=True) or {}
+    if not _valid_admin_key(body.get("key")):
+        return jsonify({"ok": False, "error": "Invalid passcode"}), 401
+    try:
+        gc.delete_video(file_id)
+        _invalidate_cache()
+        return jsonify({"ok": True, "items": gc.list_videos_admin()})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.errorhandler(413)
+def too_large(_exc):
+    return jsonify({"ok": False, "error": "File is too large (max 512MB)."}), 413
 
 
 # -------------------------------- Pages / static --------------------------------

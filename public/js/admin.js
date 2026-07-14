@@ -35,6 +35,7 @@
       refresh();
       refreshRequirements();
       refreshSchedule();
+      refreshVideos();
       clearInterval(pollTimer);
       pollTimer = setInterval(refresh, 5000);
     } catch (err) {
@@ -270,5 +271,144 @@
     return String(str).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[c]));
+  }
+
+  // -------------------- AVP videos panel --------------------
+
+  const videoForm = document.getElementById('videoForm');
+  const videoFile = document.getElementById('videoFile');
+  const videoList = document.getElementById('videoList');
+  const uploadProgress = document.getElementById('uploadProgress');
+  const uploadFill = document.getElementById('uploadFill');
+  const uploadPct = document.getElementById('uploadPct');
+
+  async function refreshVideos() {
+    try {
+      const res = await fetch('/api/admin/videos?key=' + encodeURIComponent(adminKey));
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed to load');
+      renderVideos(data.items);
+    } catch (err) {
+      videoList.innerHTML = '<li class="empty">Could not load: ' + escapeHtml(err.message) + '</li>';
+    }
+  }
+
+  function formatSize(bytes) {
+    if (!bytes && bytes !== 0) return '';
+    const mb = bytes / (1024 * 1024);
+    return mb >= 1 ? mb.toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' KB';
+  }
+
+  function renderVideos(items) {
+    videoList.innerHTML = '';
+    if (!items.length) {
+      videoList.innerHTML = '<li class="empty">No AVP videos uploaded yet.</li>';
+      return;
+    }
+    items.forEach((item) => {
+      const li = document.createElement('li');
+      li.className = 'item-row';
+      const uploaded = item.createdTime ? new Date(item.createdTime).toLocaleDateString() : '';
+      const subParts = [formatSize(item.size), uploaded].filter(Boolean);
+      li.innerHTML =
+        '<input class="name-input" type="text" value="' + escapeHtml(item.name) + '" />' +
+        '<span class="main"><span class="sub">' + escapeHtml(subParts.join(' · ')) + '</span></span>' +
+        '<button class="rename" type="button">Rename</button>' +
+        '<button class="del" type="button">Delete</button>';
+      const nameInput = li.querySelector('.name-input');
+      li.querySelector('.rename').addEventListener('click', () => renameVideo(item.id, nameInput, li));
+      li.querySelector('.del').addEventListener('click', () => deleteVideo(item.id, item.name, li));
+      videoList.appendChild(li);
+    });
+  }
+
+  videoForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const file = videoFile.files[0];
+    if (!file) return;
+    uploadVideo(file);
+  });
+
+  function uploadVideo(file) {
+    const submitBtn = videoForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    videoFile.disabled = true;
+    uploadProgress.hidden = false;
+    uploadFill.style.width = '0%';
+    uploadPct.textContent = '0%';
+
+    const formData = new FormData();
+    formData.append('key', adminKey);
+    formData.append('file', file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/admin/videos');
+    xhr.upload.addEventListener('progress', (e) => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round((e.loaded / e.total) * 100);
+      uploadFill.style.width = pct + '%';
+      uploadPct.textContent = pct + '%';
+    });
+    xhr.onload = () => {
+      uploadProgress.hidden = true;
+      submitBtn.disabled = false;
+      videoFile.disabled = false;
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (!data.ok) throw new Error(data.error || 'Upload failed');
+        renderVideos(data.items);
+        videoForm.reset();
+      } catch (err) {
+        statusNote.textContent = 'Error: ' + err.message;
+      }
+    };
+    xhr.onerror = () => {
+      uploadProgress.hidden = true;
+      submitBtn.disabled = false;
+      videoFile.disabled = false;
+      statusNote.textContent = 'Error: upload failed.';
+    };
+    xhr.send(formData);
+  }
+
+  async function renameVideo(id, nameInput, li) {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const btn = li.querySelector('.rename');
+    btn.disabled = true;
+    nameInput.disabled = true;
+    try {
+      const res = await fetch('/api/admin/videos/' + id + '/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: adminKey, name }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed to rename');
+      renderVideos(data.items);
+    } catch (err) {
+      statusNote.textContent = 'Error: ' + err.message;
+      btn.disabled = false;
+      nameInput.disabled = false;
+    }
+  }
+
+  async function deleteVideo(id, name, li) {
+    if (!confirm('Delete "' + name + '"? This removes it from Drive permanently.')) return;
+    const btn = li.querySelector('.del');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/admin/videos/' + id + '/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: adminKey }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed to delete');
+      renderVideos(data.items);
+    } catch (err) {
+      statusNote.textContent = 'Error: ' + err.message;
+      btn.disabled = false;
+    }
   }
 })();

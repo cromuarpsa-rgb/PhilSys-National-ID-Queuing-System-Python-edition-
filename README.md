@@ -86,17 +86,39 @@ header name, not position.
 ## 3. Share the Drive folder
 
 1. Create/choose a Drive folder containing your AVP `.mp4` videos.
-2. Share it with the same service account `client_email`, **Viewer** access
-   is enough.
+2. Share it with the same service account `client_email`, with **Editor**
+   (Content manager) access — needed so staff can upload, rename, and
+   delete videos from `/admin`, not just view them.
 3. From the folder's URL — `https://drive.google.com/drive/folders/THIS_PART`
    — copy the ID. You'll set this as `DRIVE_FOLDER_ID`.
 4. The kiosk lists and rotates through every video file it finds in that
-   folder automatically — drop in a new video any time, no redeploy needed.
+   folder automatically — upload a new one from `/admin` (or drop it into
+   Drive by hand) any time, no redeploy needed.
 
 > **Video playback note:** Drive's embedded player can't tell the kiosk page
 > exactly when a clip ends (cross-origin iframe), so the kiosk rotates on a
 > fixed 90-second timer instead (`VIDEO_ROTATE_MS` in `public/js/kiosk.js`).
 > For frame-accurate playback, host MP4s as static files instead of via Drive.
+
+## Staff console: managing AVP videos
+
+The third panel on `/admin` manages the videos the kiosk rotates through —
+upload a new one, rename it, or delete it, no more dropping files into Drive
+by hand.
+
+| Method | Route                                | Purpose                              |
+|--------|----------------------------------------|----------------------------------------|
+| GET    | `/api/admin/videos?key=...`            | list videos (size, upload date)        |
+| POST   | `/api/admin/videos` (multipart)        | upload a new video (max 512MB)         |
+| POST   | `/api/admin/videos/<id>/rename`        | rename a video                         |
+| POST   | `/api/admin/videos/<id>/delete`        | delete a video from Drive              |
+
+Uploads stream straight into the Drive folder via a resumable upload (so
+large AVP files never have to be fully buffered in memory), and the upload
+form shows a live progress bar. **This is why the service account now needs
+"Editor" (Content manager) access to the Drive folder, not just Viewer** —
+double-check that in Drive's Share dialog if uploads start failing after
+you update from an older version of this app.
 
 ## Staff console: managing Requirements & the mobile schedule
 
