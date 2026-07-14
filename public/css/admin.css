@@ -378,11 +378,21 @@ body {
   transition: width 0.15s ease;
 }
 
+.upload-progress .fill.finalizing {
+  animation: upload-finalizing-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes upload-finalizing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .upload-progress span {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--ink-600);
-  min-width: 34px;
+  min-width: 68px;
+  white-space: nowrap;
   text-align: right;
 }
 

@@ -441,37 +441,80 @@ def list_videos_admin():
     ]
 
 
-def create_upload_session(filename, mimetype, size=None):
-    """Starts a Drive resumable-upload session and hands back the session
-    URL. The browser then PUTs the video's bytes straight to that URL —
-    Drive's resumable endpoint supports CORS for exactly this purpose — so
-    the video never has to pass through this server at all. Only this one
-    small metadata request touches Render; the heavy part (the actual file)
-    goes browser -> Drive directly, which is why this is dramatically
-    faster than routing the bytes through the app server first."""
+def upload_video_stream(file_stream, filename, mimetype, size):
+    """Streams a video straight through this server into Drive.
+
+    NOTE: this replaces an earlier "direct-to-Drive" design where this
+    server only opened the resumable session and handed the session URL
+    back so the browser could PUT the bytes straight to Drive. That
+    doesn't work: Drive ties the resumable session's CORS allowlist to
+    the Origin header present on the request that *opened* the session.
+    Since that request came from our service-account backend (no browser
+    Origin at all), the browser's follow-up PUT gets rejected with a CORS
+    error — there's no way to authorize a browser origin for a session
+    opened server-side. So the bytes have to pass through this server
+    after all.
+
+    To avoid the obvious downside (buffering a whole video in memory,
+    and the Render->Drive leg only starting once the browser->Render leg
+    finishes), this reads the incoming request body in fixed-size chunks
+    and forwards each chunk to Drive as it arrives, so memory stays flat
+    and the two legs overlap instead of happening back-to-back.
+    """
     _require_drive_folder()
     filename = str(filename or "untitled-video").strip() or "untitled-video"
     mimetype = mimetype or mimetypes.guess_type(filename)[0] or "video/mp4"
     if not mimetype.startswith("video"):
         raise ValueError("Only video files can be uploaded here.")
+    try:
+        size = int(size)
+    except (TypeError, ValueError):
+        size = 0
+    if size <= 0:
+        raise ValueError("A valid file size is required to stream the upload.")
 
-    headers = {"X-Upload-Content-Type": mimetype}
-    if size:
-        headers["X-Upload-Content-Length"] = str(size)
+    session = _drive_authed_session()
 
-    resp = _drive_authed_session().post(
+    # 1) Open the resumable session (small JSON request/response, same as
+    #    before — this part was never the problem).
+    init_resp = session.post(
         DRIVE_UPLOAD_URL,
         params={"uploadType": "resumable", "supportsAllDrives": "true"},
         json={"name": filename, "parents": [DRIVE_FOLDER_ID]},
-        headers=headers,
+        headers={
+            "X-Upload-Content-Type": mimetype,
+            "X-Upload-Content-Length": str(size),
+        },
         timeout=30,
     )
-    if resp.status_code >= 300:
-        raise RuntimeError(f"Drive rejected the upload request ({resp.status_code}): {resp.text[:200]}")
-    upload_url = resp.headers.get("Location")
+    if init_resp.status_code >= 300:
+        raise RuntimeError(f"Drive rejected the upload request ({init_resp.status_code}): {init_resp.text[:200]}")
+    upload_url = init_resp.headers.get("Location")
     if not upload_url:
         raise RuntimeError("Drive did not return an upload session URL.")
-    return upload_url
+
+    # 2) Stream the bytes straight through, chunk by chunk, as they arrive
+    #    from the browser — never buffered in full on this server.
+    chunk_size = 8 * 1024 * 1024  # 8MB
+
+    def _chunks():
+        remaining = size
+        while remaining > 0:
+            chunk = file_stream.read(min(chunk_size, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
+
+    put_resp = session.put(
+        upload_url,
+        data=_chunks(),
+        headers={"Content-Type": mimetype, "Content-Length": str(size)},
+        timeout=600,
+    )
+    if put_resp.status_code >= 300:
+        raise RuntimeError(f"Drive rejected the file upload ({put_resp.status_code}): {put_resp.text[:200]}")
+    return put_resp.json()
 
 
 def rename_video(file_id, new_name):

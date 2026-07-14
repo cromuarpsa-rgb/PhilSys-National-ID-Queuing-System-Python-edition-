@@ -334,68 +334,74 @@
     submitBtn.disabled = true;
     videoFile.disabled = true;
     uploadProgress.hidden = false;
+    uploadFill.classList.remove('finalizing');
     uploadFill.style.width = '0%';
     uploadPct.textContent = '0%';
 
     try {
-      // 1) ask our server to open a Drive resumable-upload session (small,
-      //    fast JSON round-trip — no file bytes involved yet)
-      const initRes = await fetch('/api/admin/videos/init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: adminKey,
-          filename: file.name,
-          mimetype: file.type || 'video/mp4',
-          size: file.size,
-        }),
+      // The video streams to our own server, which forwards it to Drive
+      // as it arrives (server-proxied, not browser -> Drive direct — see
+      // google_client.upload_video_stream for why direct-to-Drive doesn't
+      // work here). Key/filename/mimetype/size go as query params since
+      // the body is the raw file, not JSON.
+      const params = new URLSearchParams({
+        key: adminKey,
+        filename: file.name,
+        mimetype: file.type || 'video/mp4',
+        size: String(file.size),
       });
-      const initData = await initRes.json();
-      if (!initData.ok) throw new Error(initData.error || 'Could not start upload');
-
-      // 2) PUT the file straight to Drive using that session URL — this is
-      //    the part that used to go through our server and made uploads
-      //    slow; now it goes browser -> Drive directly.
-      await putDirectToDrive(initData.uploadUrl, file);
-
-      // 3) tell our server the upload is done so it refreshes its cache
-      const confirmRes = await fetch('/api/admin/videos/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: adminKey }),
-      });
-      const confirmData = await confirmRes.json();
-      if (!confirmData.ok) throw new Error(confirmData.error || 'Upload finished but list refresh failed');
-      renderVideos(confirmData.items);
+      const data = await putThroughServer('/api/admin/videos/upload?' + params.toString(), file);
+      if (!data.ok) throw new Error(data.error || 'Upload failed');
+      renderVideos(data.items);
       videoForm.reset();
     } catch (err) {
       statusNote.textContent = 'Error: ' + err.message;
     } finally {
       uploadProgress.hidden = true;
+      uploadFill.classList.remove('finalizing');
       submitBtn.disabled = false;
       videoFile.disabled = false;
     }
   }
 
-  function putDirectToDrive(uploadUrl, file) {
+  function putThroughServer(url, file) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl);
+      xhr.open('PUT', url);
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       xhr.upload.addEventListener('progress', (e) => {
         if (!e.lengthComputable) return;
         const pct = Math.round((e.loaded / e.total) * 100);
         uploadFill.style.width = pct + '%';
-        uploadPct.textContent = pct + '%';
+        if (pct >= 100) {
+          // All bytes have left the browser, but the server is still
+          // streaming the tail through to Drive and waiting on Drive's
+          // ack — show that instead of leaving the bar sitting at 100%
+          // looking stalled.
+          uploadFill.classList.add('finalizing');
+          uploadPct.textContent = 'Finalizing…';
+        } else {
+          uploadPct.textContent = pct + '%';
+        }
       });
       xhr.onload = () => {
+        uploadFill.classList.remove('finalizing');
         if (xhr.status >= 200 && xhr.status < 300) {
-          resolve();
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            reject(new Error('Upload finished but the response was unreadable'));
+          }
         } else {
-          reject(new Error('Drive upload failed (status ' + xhr.status + ')'));
+          let message = 'Upload failed (status ' + xhr.status + ')';
+          try {
+            const parsed = JSON.parse(xhr.responseText);
+            if (parsed && parsed.error) message = parsed.error;
+          } catch (e) { /* non-JSON error body, keep default message */ }
+          reject(new Error(message));
         }
       };
-      xhr.onerror = () => reject(new Error('Network error while uploading to Drive'));
+      xhr.onerror = () => reject(new Error('Network error while uploading'));
       xhr.send(file);
     });
   }

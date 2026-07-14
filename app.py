@@ -15,7 +15,7 @@ from flask import Flask, jsonify, request, send_from_directory
 import google_client as gc
 
 app = Flask(__name__, static_folder=None)
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB — plenty for JSON API bodies; videos now upload direct-to-Drive
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_BYTES", 512 * 1024 * 1024))  # 512MB default — video bytes stream through this server on their way to Drive (see /api/admin/videos/upload)
 
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
 PUBLIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
@@ -229,39 +229,30 @@ def api_admin_videos_list():
         return jsonify({"ok": False, "error": str(exc)}), 502
 
 
-@app.post("/api/admin/videos/init")
-def api_admin_videos_init():
-    # Small JSON request — kicks off a Drive resumable-upload session and
-    # hands the session URL back so the browser can PUT the video straight
-    # to Drive, without routing the bytes through this server.
-    body = request.get_json(silent=True) or {}
-    if not _valid_admin_key(body.get("key")):
+@app.put("/api/admin/videos/upload")
+def api_admin_videos_upload():
+    # The video's raw bytes are the request body (a plain PUT, not
+    # multipart) — key/filename/mimetype/size travel as query params since
+    # there's no JSON body to carry them. This server streams the body
+    # straight through to Drive as it arrives (see
+    # google_client.upload_video_stream for why it can't go direct-to-Drive
+    # from the browser instead).
+    if not _valid_admin_key(request.args.get("key")):
         return jsonify({"ok": False, "error": "Invalid passcode"}), 401
-    filename = str(body.get("filename") or "").strip()
+    filename = str(request.args.get("filename") or "").strip()
     if not filename:
         return jsonify({"ok": False, "error": "filename is required"}), 400
     try:
-        upload_url = gc.create_upload_session(
-            filename, body.get("mimetype"), body.get("size")
+        gc.upload_video_stream(
+            request.stream,
+            filename,
+            request.args.get("mimetype"),
+            request.args.get("size"),
         )
-        return jsonify({"ok": True, "uploadUrl": upload_url})
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except Exception as exc:  # noqa: BLE001
-        return jsonify({"ok": False, "error": str(exc)}), 502
-
-
-@app.post("/api/admin/videos/confirm")
-def api_admin_videos_confirm():
-    # Called after the browser's direct PUT to Drive finishes, so the
-    # kiosk/tablet's /api/data cache picks up the new video right away
-    # instead of waiting out the cache TTL.
-    body = request.get_json(silent=True) or {}
-    if not _valid_admin_key(body.get("key")):
-        return jsonify({"ok": False, "error": "Invalid passcode"}), 401
-    try:
         _invalidate_cache()
         return jsonify({"ok": True, "items": gc.list_videos_admin()})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
         return jsonify({"ok": False, "error": str(exc)}), 502
 

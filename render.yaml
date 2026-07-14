@@ -4,7 +4,11 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 600
+    # --timeout 600: video uploads now stream through this worker on their
+    # way to Drive (see README "Staff console: managing AVP videos"), and
+    # gunicorn's default 30s worker timeout would kill any upload that
+    # takes longer than that to transfer.
     envVars:
       - key: GOOGLE_SHEET_ID
         sync: false

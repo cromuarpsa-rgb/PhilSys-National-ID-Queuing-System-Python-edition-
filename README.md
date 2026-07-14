@@ -106,35 +106,51 @@ The third panel on `/admin` manages the videos the kiosk rotates through —
 upload a new one, rename it, or delete it, no more dropping files into Drive
 by hand.
 
-Uploads go **directly from the browser to Google Drive**, not through this
-server. Routing a whole video through a free-tier Render instance first
-(browser → Render → Drive) was the main reason uploads used to feel slow —
-Render's free plan has limited CPU/bandwidth and the file effectively had to
-travel the network twice. Now only a small JSON handshake touches Render;
-the video bytes go straight to Drive's own infrastructure, using Drive's
-[resumable upload protocol](https://developers.google.com/drive/api/guides/manage-uploads#resumable),
-which supports cross-origin (CORS) PUT requests from a browser for exactly
-this purpose.
+Uploads are **streamed through this server** to Google Drive — the browser
+PUTs the file to this app, which forwards the bytes to Drive's
+[resumable upload protocol](https://developers.google.com/drive/api/guides/manage-uploads#resumable)
+in fixed-size chunks as they arrive, rather than buffering the whole file in
+memory first.
+
+An earlier version of this feature tried a "direct-to-Drive" design instead
+— have this server open the resumable session, then let the browser PUT
+straight to Drive, so the video bytes would never touch Render at all. That
+doesn't work: Drive scopes a resumable session's CORS allowlist to the
+Origin header on the request that *opened* the session. Since that request
+came from this server's service account (no browser Origin), the browser's
+follow-up PUT is rejected with a CORS error — there's no way to authorize a
+browser origin for a session opened server-side. So the bytes have to pass
+through this server after all; streaming (instead of buffer-then-forward)
+keeps memory flat and lets the browser→Render and Render→Drive legs overlap
+instead of happening one after the other.
 
 | Method | Route                                | Purpose                                          |
 |--------|----------------------------------------|-----------------------------------------------------|
 | GET    | `/api/admin/videos?key=...`            | list videos (size, upload date)                     |
-| POST   | `/api/admin/videos/init`               | open a Drive resumable-upload session, return its URL |
-| POST   | `/api/admin/videos/confirm`            | tell the server the upload finished (refreshes cache) |
+| PUT    | `/api/admin/videos/upload?key=...&filename=...&mimetype=...&size=...` | stream a video's bytes through to Drive |
 | POST   | `/api/admin/videos/<id>/rename`        | rename a video                                       |
 | POST   | `/api/admin/videos/<id>/delete`        | delete a video from Drive                            |
 
 The upload flow from `/admin`:
 
-1. Browser calls `/api/admin/videos/init` with the passcode + filename/type/size.
-2. The server asks Drive to open a resumable session (one small server-to-Drive
-   request) and hands the session URL back.
-3. The browser `PUT`s the file straight to that Drive URL — this is the part
-   that's actually slow for large videos, and it's now bottlenecked only by
-   your own upload bandwidth and Drive, not by Render.
-4. The browser calls `/api/admin/videos/confirm`, which clears the
+1. Browser `PUT`s the raw file bytes to `/api/admin/videos/upload`, with the
+   passcode + filename/type/size as query params (there's no JSON body here,
+   just the file).
+2. The server opens a Drive resumable session, then reads the incoming
+   request body in 8MB chunks and forwards each chunk to Drive as it
+   arrives — never buffering the full file.
+3. Once Drive acknowledges the last chunk, the server refreshes the
    `/api/data` cache so the kiosk and citizen tablet pick up the new video on
-   their next poll instead of waiting out the cache TTL.
+   their next poll instead of waiting out the cache TTL, and returns the
+   updated video list in the same response.
+
+Because the bytes now pass through Render, the upload is bounded by
+whichever is slower — your upload bandwidth to Render, or Render's own
+bandwidth to Drive — instead of being bottlenecked only by Drive. The
+admin console's progress bar tracks the browser→Render leg; once that
+hits 100% it switches to a "Finalizing…" pulse for the tail of the
+Render→Drive leg, so it doesn't look stalled while the server finishes
+forwarding and Drive acks the upload.
 
 This is why the service account needs "Editor" (Content manager) access to
 the Drive folder, not just Viewer — double-check that in Drive's Share
