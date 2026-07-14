@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PhilSys National ID — Queuing Display</title>
+  <link rel="icon" type="image/png" href="/assets/favicon-32.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon-180.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/kiosk.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <img class="logo" src="/assets/logo.png" alt="Philippine Statistics Authority — Philippine Identification System" />
+      <div class="titles">
+        <span class="kicker">Official Queuing Display</span>
+        <span class="main">PhilSys National ID Registration Center</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="clockbox">
+        <div class="time" id="clockTime">--:--:--</div>
+        <div class="date" id="clockDate">—</div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- Panel 1: AVP video -->
+      <section class="panel panel-video" aria-label="Audio-visual presentation">
+        <div class="video-frame" id="videoFrame">
+          <div class="video-empty" id="videoEmpty">Loading AVP playlist…</div>
+        </div>
+      </section>
+
+      <!-- Panel 2: Queue -->
+      <section class="panel panel-queue" aria-label="Queue numbers">
+        <div class="panel-head">
+          <h2>Now Serving</h2>
+        </div>
+        <div class="queue-cols">
+          <div class="queue-col registration">
+            <span class="line-label">Registration</span>
+            <span class="now-serving">Now Serving</span>
+            <span class="led" id="regServing">000</span>
+            <span class="next-up" id="regTicket">Latest ticket: R-000</span>
+          </div>
+          <div class="queue-col verification">
+            <span class="line-label">Verification</span>
+            <span class="now-serving">Now Serving</span>
+            <span class="led" id="verServing">000</span>
+            <span class="next-up" id="verTicket">Latest ticket: V-000</span>
+          </div>
+        </div>
+        <div class="queue-foot" id="queueDate">Sequence resets daily</div>
+      </section>
+
+      <!-- Panel 3: Requirements -->
+      <section class="panel panel-requirements" aria-label="Requirements">
+        <div class="panel-head">
+          <h2>Requirements</h2>
+        </div>
+        <div class="blink-row" id="blinkRow">
+          <div class="chip primary">
+            <span class="chip-label">Primary</span>
+            <span id="primaryReq">Loading…</span>
+          </div>
+          <div class="chip secondary">
+            <span class="chip-label">Secondary</span>
+            <span id="secondaryReq">Loading…</span>
+          </div>
+        </div>
+        <div class="marquee-wrap">
+          <ul class="marquee-list" id="reqMarquee"></ul>
+        </div>
+      </section>
+
+      <!-- Panel 4: Mobile registration schedule -->
+      <section class="panel panel-schedule" aria-label="Mobile registration schedule">
+        <div class="panel-head">
+          <h2>Mobile Registration Schedule</h2>
+        </div>
+        <div class="schedule-table-wrap" id="scheduleWrap">
+          <div class="schedule-empty">Loading schedule…</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/kiosk.js"></script>
+</body>
+</html>

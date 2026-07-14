@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PhilSys National ID — Get a Number</title>
+  <link rel="icon" type="image/png" href="/assets/favicon-32.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon-180.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/enduser.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="brandbar">
+      <img src="/assets/logo.png" alt="Philippine Statistics Authority — Philippine Identification System" />
+      <div class="titles">
+        <div class="kicker">Take a number</div>
+        <div class="main">PhilSys National ID Registration Center</div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="screen" id="homeScreen">
+        <h1>Welcome. What are you here for today?</h1>
+        <p class="sub">Tap one option below to get your queue number.</p>
+        <div class="choice-grid">
+          <button class="choice-card registration" data-line="registration">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20v-1a5 5 0 0 1 5-5h1a5 5 0 0 1 5 5v1" stroke-linecap="round"/><circle cx="9.5" cy="8" r="3.5"/><path d="M15 4.2a3.5 3.5 0 0 1 0 6.8" stroke-linecap="round"/><path d="M20 20v-1a5 5 0 0 0-3-4.6" stroke-linecap="round"/></svg>
+            <span class="label">New Registration</span>
+            <span class="desc">First-time PhilSys ID application &amp; demographic capture</span>
+          </button>
+          <button class="choice-card verification" data-line="verification">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 12.5l2 2 4-4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3l7 3v5c0 5-3.2 8.6-7 10-3.8-1.4-7-5-7-10V6l7-3z" stroke-linejoin="round"/></svg>
+            <span class="label">Verification / Update</span>
+            <span class="desc">ID verification, correction, or record update</span>
+          </button>
+        </div>
+        <div class="error-note" id="errorNote" hidden></div>
+      </div>
+
+      <div class="screen" id="ticketScreen" hidden>
+        <div class="ticket" id="ticketCard">
+          <div class="kicker" id="ticketKicker">Your Number</div>
+          <div class="number" id="ticketNumber">R-000</div>
+          <p class="msg">Please have a seat and watch the display screen. We'll call your number when it's your turn.</p>
+          <button class="back" id="backBtn">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">Republic of the Philippines · Philippine Statistics Authority · PhilSys</div>
+  </div>
+
+  <script src="/js/enduser.js"></script>
+</body>
+</html>

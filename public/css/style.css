@@ -1,0 +1,88 @@
+/* =========================================================================
+   NID Queuing System — shared design tokens
+   Palette pulled from the PhilSys National ID mark: deep official navy,
+   PSA gold and red, plus a registration-blue / verification-green pairing
+   for the two queue lines.
+   ========================================================================= */
+
+:root {
+  --navy-950: #0a1130;
+  --navy-900: #0f1a3d;
+  --navy-800: #16265a;
+  --navy-700: #1f3577;
+  --gold-500: #f2b705;
+  --gold-300: #ffd94d;
+  --red-600: #c8203e;
+  --red-500: #e8324f;
+  --blue-500: #2f6fe4;
+  --blue-400: #5b8fef;
+  --green-500: #17a568;
+  --green-400: #3ecf8e;
+  --paper-100: #f5f2ea;
+  --paper-050: #faf8f3;
+  --ink-900: #10162b;
+  --ink-600: #4b5170;
+  --line: rgba(255, 255, 255, 0.12);
+  --line-soft: rgba(16, 22, 43, 0.12);
+
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--navy-950);
+  color: var(--paper-100);
+  font-family: var(--font-body);
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--gold-500);
+  color: var(--navy-950);
+}
+
+/* Subtle screen-reader-friendly focus ring, kept everywhere per accessibility floor */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--gold-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.hairline {
+  border: 1px solid var(--line);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--gold-300);
+}

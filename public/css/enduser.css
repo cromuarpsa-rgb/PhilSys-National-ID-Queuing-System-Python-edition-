@@ -1,0 +1,188 @@
+html,
+body {
+  height: 100%;
+  background: var(--paper-100);
+  color: var(--ink-900);
+}
+
+.wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 20px 40px;
+}
+
+.brandbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 760px;
+  margin-bottom: 34px;
+}
+
+.brandbar img {
+  height: 40px;
+}
+
+.brandbar .titles {
+  line-height: 1.15;
+}
+
+.brandbar .titles .kicker {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--navy-700);
+}
+
+.brandbar .titles .main {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink-900);
+}
+
+.stage {
+  width: 100%;
+  max-width: 760px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------------- Home screen: choose a line ---------------- */
+.screen {
+  width: 100%;
+}
+
+.screen h1 {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  text-align: center;
+  margin: 0 0 8px;
+  color: var(--ink-900);
+}
+
+.screen p.sub {
+  text-align: center;
+  color: var(--ink-600);
+  margin: 0 0 32px;
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.choice-card {
+  border: none;
+  border-radius: 22px;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: #fff;
+  font-family: var(--font-display);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 10px 30px rgba(16, 22, 43, 0.15);
+}
+
+.choice-card:active {
+  transform: scale(0.97);
+}
+
+.choice-card.registration {
+  background: linear-gradient(155deg, var(--blue-500), var(--navy-700));
+}
+
+.choice-card.verification {
+  background: linear-gradient(155deg, var(--green-500), #0d6b46);
+}
+
+.choice-card .icon {
+  width: 56px;
+  height: 56px;
+}
+
+.choice-card .label {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.choice-card .desc {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  opacity: 0.9;
+  text-align: center;
+  font-weight: 400;
+}
+
+/* ---------------- Ticket screen ---------------- */
+.ticket {
+  background: #fff;
+  border-radius: 26px;
+  padding: 40px 34px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(16, 22, 43, 0.18);
+  border-top: 10px solid var(--gold-500);
+}
+
+.ticket.registration {
+  border-top-color: var(--blue-500);
+}
+
+.ticket.verification {
+  border-top-color: var(--green-500);
+}
+
+.ticket .kicker {
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--ink-600);
+}
+
+.ticket .number {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 4.2rem;
+  margin: 10px 0 6px;
+  color: var(--navy-900);
+}
+
+.ticket .msg {
+  color: var(--ink-600);
+  max-width: 42ch;
+  margin: 0 auto 26px;
+}
+
+.ticket button.back {
+  border: none;
+  background: var(--navy-900);
+  color: #fff;
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.error-note {
+  text-align: center;
+  color: var(--red-600);
+  font-size: 0.85rem;
+  margin-top: 18px;
+}
+
+.footer-note {
+  margin-top: 26px;
+  text-align: center;
+  color: var(--ink-600);
+  font-size: 0.78rem;
+}

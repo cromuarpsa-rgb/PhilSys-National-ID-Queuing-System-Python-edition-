@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Staff Console — PhilSys National ID Queuing</title>
+  <link rel="icon" type="image/png" href="/assets/favicon-32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="brandbar">
+      <img src="/assets/logo.png" alt="PSA PhilSys" />
+      <div class="titles">
+        <div class="kicker">Staff Console</div>
+        <div class="main">Queue Call Control</div>
+      </div>
+    </div>
+
+    <div class="gate" id="gate">
+      <h1>Enter passcode</h1>
+      <p>Ask your supervisor if you don't have the console passcode.</p>
+      <input id="keyInput" type="password" inputmode="numeric" placeholder="••••" maxlength="12" />
+      <button id="unlockBtn">Unlock</button>
+      <div class="err" id="gateErr"></div>
+    </div>
+
+    <div class="console" id="console" hidden>
+      <div class="toolbar">
+        <span class="date" id="consoleDate">—</span>
+        <button class="reset" id="resetBtn">Reset today's counters</button>
+      </div>
+
+      <div class="line-card registration">
+        <span class="label">Registration</span>
+        <div class="stat"><div class="n" id="regServing">000</div><div class="l">Now Serving</div></div>
+        <div class="stat"><div class="n" id="regTicket">000</div><div class="l">Latest Ticket</div></div>
+        <div class="btns">
+          <button class="prev" data-line="registration" data-action="prev">◀ Back</button>
+          <button class="next" data-line="registration" data-action="next">Call Next ▶</button>
+        </div>
+      </div>
+
+      <div class="line-card verification">
+        <span class="label">Verification</span>
+        <div class="stat"><div class="n" id="verServing">000</div><div class="l">Now Serving</div></div>
+        <div class="stat"><div class="n" id="verTicket">000</div><div class="l">Latest Ticket</div></div>
+        <div class="btns">
+          <button class="prev" data-line="verification" data-action="prev">◀ Back</button>
+          <button class="next" data-line="verification" data-action="next">Call Next ▶</button>
+        </div>
+      </div>
+
+      <div class="status" id="statusNote"></div>
+
+      <div class="panel" id="reqPanel">
+        <div class="panel-head">
+          <h2>Requirements list</h2>
+          <span class="panel-sub">Shown on the citizen tablet &amp; kiosk</span>
+        </div>
+        <form class="add-form" id="reqForm">
+          <select id="reqCategory">
+            <option value="Primary">Primary</option>
+            <option value="Secondary">Secondary</option>
+            <option value="Other" selected>Other</option>
+          </select>
+          <input id="reqText" type="text" placeholder="Requirement text" required />
+          <input id="reqOrder" type="number" placeholder="Order" step="1" />
+          <button type="submit">Add</button>
+        </form>
+        <ul class="item-list" id="reqList"></ul>
+      </div>
+
+      <div class="panel" id="schedPanel">
+        <div class="panel-head">
+          <h2>Mobile registration schedule</h2>
+          <span class="panel-sub">Upcoming outreach dates</span>
+        </div>
+        <form class="add-form grid" id="schedForm">
+          <input id="schedDate" type="text" placeholder="Date (YYYY-MM-DD)" required />
+          <input id="schedDay" type="text" placeholder="Day" />
+          <input id="schedVenue" type="text" placeholder="Venue" required />
+          <input id="schedStart" type="text" placeholder="Time start" />
+          <input id="schedEnd" type="text" placeholder="Time end" />
+          <input id="schedSlots" type="text" placeholder="Slots" />
+          <input id="schedNotes" type="text" placeholder="Notes" />
+          <button type="submit">Add</button>
+        </form>
+        <ul class="item-list" id="schedList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
