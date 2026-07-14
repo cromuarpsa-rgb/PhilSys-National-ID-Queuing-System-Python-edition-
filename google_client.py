@@ -24,13 +24,15 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from google.oauth2 import service_account
+from google.auth.transport.requests import AuthorizedSession
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
+
+DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
 
 TIMEZONE = ZoneInfo("Asia/Manila")
 
@@ -95,6 +97,19 @@ def _drive():
     if _drive_service is None:
         _drive_service = build("drive", "v3", credentials=_load_credentials(), cache_discovery=False)
     return _drive_service
+
+
+_authed_session = None
+
+
+def _drive_authed_session():
+    """A requests.Session that auto-attaches (and auto-refreshes) the
+    service account's Bearer token — used to talk to Drive's raw upload
+    endpoint directly, outside the googleapiclient wrapper."""
+    global _authed_session
+    if _authed_session is None:
+        _authed_session = AuthorizedSession(_load_credentials())
+    return _authed_session
 
 
 def _require_sheet_id():
@@ -426,32 +441,37 @@ def list_videos_admin():
     ]
 
 
-def upload_video(file_storage):
-    """file_storage is a werkzeug FileStorage (request.files['file']).
-    Streams it straight into the Drive folder as a new file — resumable
-    upload so large AVP files don't have to fit in memory at once."""
+def create_upload_session(filename, mimetype, size=None):
+    """Starts a Drive resumable-upload session and hands back the session
+    URL. The browser then PUTs the video's bytes straight to that URL —
+    Drive's resumable endpoint supports CORS for exactly this purpose — so
+    the video never has to pass through this server at all. Only this one
+    small metadata request touches Render; the heavy part (the actual file)
+    goes browser -> Drive directly, which is why this is dramatically
+    faster than routing the bytes through the app server first."""
     _require_drive_folder()
-    filename = file_storage.filename or "untitled-video"
-    mimetype = file_storage.mimetype or mimetypes.guess_type(filename)[0] or "video/mp4"
+    filename = str(filename or "untitled-video").strip() or "untitled-video"
+    mimetype = mimetype or mimetypes.guess_type(filename)[0] or "video/mp4"
     if not mimetype.startswith("video"):
         raise ValueError("Only video files can be uploaded here.")
-    media = MediaIoBaseUpload(file_storage.stream, mimetype=mimetype, chunksize=5 * 1024 * 1024, resumable=True)
-    request_obj = _drive().files().create(
-        body={"name": filename, "parents": [DRIVE_FOLDER_ID]},
-        media_body=media,
-        fields="id,name,mimeType,size,createdTime",
-        supportsAllDrives=True,
+
+    headers = {"X-Upload-Content-Type": mimetype}
+    if size:
+        headers["X-Upload-Content-Length"] = str(size)
+
+    resp = _drive_authed_session().post(
+        DRIVE_UPLOAD_URL,
+        params={"uploadType": "resumable", "supportsAllDrives": "true"},
+        json={"name": filename, "parents": [DRIVE_FOLDER_ID]},
+        headers=headers,
+        timeout=30,
     )
-    response = None
-    while response is None:
-        _status, response = request_obj.next_chunk()
-    return {
-        "id": response["id"],
-        "name": response["name"],
-        "mimeType": response.get("mimeType", ""),
-        "size": int(response["size"]) if response.get("size") else None,
-        "createdTime": response.get("createdTime", ""),
-    }
+    if resp.status_code >= 300:
+        raise RuntimeError(f"Drive rejected the upload request ({resp.status_code}): {resp.text[:200]}")
+    upload_url = resp.headers.get("Location")
+    if not upload_url:
+        raise RuntimeError("Drive did not return an upload session URL.")
+    return upload_url
 
 
 def rename_video(file_id, new_name):

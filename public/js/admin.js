@@ -329,7 +329,7 @@
     uploadVideo(file);
   });
 
-  function uploadVideo(file) {
+  async function uploadVideo(file) {
     const submitBtn = videoForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     videoFile.disabled = true;
@@ -337,38 +337,67 @@
     uploadFill.style.width = '0%';
     uploadPct.textContent = '0%';
 
-    const formData = new FormData();
-    formData.append('key', adminKey);
-    formData.append('file', file);
+    try {
+      // 1) ask our server to open a Drive resumable-upload session (small,
+      //    fast JSON round-trip — no file bytes involved yet)
+      const initRes = await fetch('/api/admin/videos/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: adminKey,
+          filename: file.name,
+          mimetype: file.type || 'video/mp4',
+          size: file.size,
+        }),
+      });
+      const initData = await initRes.json();
+      if (!initData.ok) throw new Error(initData.error || 'Could not start upload');
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/admin/videos');
-    xhr.upload.addEventListener('progress', (e) => {
-      if (!e.lengthComputable) return;
-      const pct = Math.round((e.loaded / e.total) * 100);
-      uploadFill.style.width = pct + '%';
-      uploadPct.textContent = pct + '%';
+      // 2) PUT the file straight to Drive using that session URL — this is
+      //    the part that used to go through our server and made uploads
+      //    slow; now it goes browser -> Drive directly.
+      await putDirectToDrive(initData.uploadUrl, file);
+
+      // 3) tell our server the upload is done so it refreshes its cache
+      const confirmRes = await fetch('/api/admin/videos/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: adminKey }),
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmData.ok) throw new Error(confirmData.error || 'Upload finished but list refresh failed');
+      renderVideos(confirmData.items);
+      videoForm.reset();
+    } catch (err) {
+      statusNote.textContent = 'Error: ' + err.message;
+    } finally {
+      uploadProgress.hidden = true;
+      submitBtn.disabled = false;
+      videoFile.disabled = false;
+    }
+  }
+
+  function putDirectToDrive(uploadUrl, file) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.upload.addEventListener('progress', (e) => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        uploadFill.style.width = pct + '%';
+        uploadPct.textContent = pct + '%';
+      });
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error('Drive upload failed (status ' + xhr.status + ')'));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error while uploading to Drive'));
+      xhr.send(file);
     });
-    xhr.onload = () => {
-      uploadProgress.hidden = true;
-      submitBtn.disabled = false;
-      videoFile.disabled = false;
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (!data.ok) throw new Error(data.error || 'Upload failed');
-        renderVideos(data.items);
-        videoForm.reset();
-      } catch (err) {
-        statusNote.textContent = 'Error: ' + err.message;
-      }
-    };
-    xhr.onerror = () => {
-      uploadProgress.hidden = true;
-      submitBtn.disabled = false;
-      videoFile.disabled = false;
-      statusNote.textContent = 'Error: upload failed.';
-    };
-    xhr.send(formData);
   }
 
   async function renameVideo(id, nameInput, li) {

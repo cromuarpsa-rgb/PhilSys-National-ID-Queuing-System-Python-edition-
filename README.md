@@ -106,19 +106,40 @@ The third panel on `/admin` manages the videos the kiosk rotates through —
 upload a new one, rename it, or delete it, no more dropping files into Drive
 by hand.
 
-| Method | Route                                | Purpose                              |
-|--------|----------------------------------------|----------------------------------------|
-| GET    | `/api/admin/videos?key=...`            | list videos (size, upload date)        |
-| POST   | `/api/admin/videos` (multipart)        | upload a new video (max 512MB)         |
-| POST   | `/api/admin/videos/<id>/rename`        | rename a video                         |
-| POST   | `/api/admin/videos/<id>/delete`        | delete a video from Drive              |
+Uploads go **directly from the browser to Google Drive**, not through this
+server. Routing a whole video through a free-tier Render instance first
+(browser → Render → Drive) was the main reason uploads used to feel slow —
+Render's free plan has limited CPU/bandwidth and the file effectively had to
+travel the network twice. Now only a small JSON handshake touches Render;
+the video bytes go straight to Drive's own infrastructure, using Drive's
+[resumable upload protocol](https://developers.google.com/drive/api/guides/manage-uploads#resumable),
+which supports cross-origin (CORS) PUT requests from a browser for exactly
+this purpose.
 
-Uploads stream straight into the Drive folder via a resumable upload (so
-large AVP files never have to be fully buffered in memory), and the upload
-form shows a live progress bar. **This is why the service account now needs
-"Editor" (Content manager) access to the Drive folder, not just Viewer** —
-double-check that in Drive's Share dialog if uploads start failing after
-you update from an older version of this app.
+| Method | Route                                | Purpose                                          |
+|--------|----------------------------------------|-----------------------------------------------------|
+| GET    | `/api/admin/videos?key=...`            | list videos (size, upload date)                     |
+| POST   | `/api/admin/videos/init`               | open a Drive resumable-upload session, return its URL |
+| POST   | `/api/admin/videos/confirm`            | tell the server the upload finished (refreshes cache) |
+| POST   | `/api/admin/videos/<id>/rename`        | rename a video                                       |
+| POST   | `/api/admin/videos/<id>/delete`        | delete a video from Drive                            |
+
+The upload flow from `/admin`:
+
+1. Browser calls `/api/admin/videos/init` with the passcode + filename/type/size.
+2. The server asks Drive to open a resumable session (one small server-to-Drive
+   request) and hands the session URL back.
+3. The browser `PUT`s the file straight to that Drive URL — this is the part
+   that's actually slow for large videos, and it's now bottlenecked only by
+   your own upload bandwidth and Drive, not by Render.
+4. The browser calls `/api/admin/videos/confirm`, which clears the
+   `/api/data` cache so the kiosk and citizen tablet pick up the new video on
+   their next poll instead of waiting out the cache TTL.
+
+This is why the service account needs "Editor" (Content manager) access to
+the Drive folder, not just Viewer — double-check that in Drive's Share
+dialog if uploads start failing after you update from an older version of
+this app.
 
 ## Staff console: managing Requirements & the mobile schedule
 
