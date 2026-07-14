@@ -9,6 +9,7 @@ change.
 
 import os
 import time
+import traceback
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -254,6 +255,8 @@ def api_admin_videos_upload():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
+        print(f"[upload] route error: {exc!r}", flush=True)
+        traceback.print_exc()
         return jsonify({"ok": False, "error": str(exc)}), 502
 
 
